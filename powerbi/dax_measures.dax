@@ -1,0 +1,161 @@
+// ==============================================================================
+// DESAFIO TÉCNICO RZK DIGITAL - MEDIDAS DAX PROFISSIONAIS
+// ==============================================================================
+
+// --- 01. MÉTRICAS PRINCIPAIS ---
+
+Faturamento Total = 
+SUM(ft_itens_pedidos[price])
+
+Volume de Itens Vendidos = 
+COUNTROWS(ft_itens_pedidos)
+
+Total de Pedidos = 
+DISTINCTCOUNT(ft_itens_pedidos[order_id])
+
+Total de Frete = 
+SUM(ft_itens_pedidos[freight_value])
+
+Total de Clientes = 
+DISTINCTCOUNT(ft_itens_pedidos[customer_id])
+
+Total de Sellers Ativos = 
+DISTINCTCOUNT(ft_itens_pedidos[seller_id])
+
+
+// --- 02. MÉDIAS E TICKETS ---
+
+Ticket Médio por Pedido = 
+DIVIDE(
+    [Faturamento Total],
+    [Total de Pedidos],
+    0
+)
+
+Ticket Médio por Item = 
+DIVIDE(
+    [Faturamento Total],
+    [Volume de Itens Vendidos],
+    0
+)
+
+// Nota média ponderada por pedido para evitar distorção em compras de múltiplos itens
+Nota Média Avaliação = 
+AVERAGEX(
+    KEEPFILTERS(VALUES(ft_itens_pedidos[order_id])),
+    CALCULATE(AVERAGE(ft_avaliacoes[review_score]))
+)
+
+Total de Avaliações = 
+CALCULATE(
+    COUNT(ft_avaliacoes[review_id]),
+    USERELATIONSHIP(ft_itens_pedidos[order_id], ft_avaliacoes[order_id])
+)
+
+
+// --- 03. CRITÉRIOS DE RELEVÂNCIA ESTATÍSTICA ---
+
+Nota Média Relevante (Min 25 Avaliações) = 
+IF(
+    [Total de Avaliações] >= 25,
+    [Nota Média Avaliação],
+    BLANK()
+)
+
+Nota Média Seller Relevante (Min 20 Avaliações) = 
+IF(
+    [Total de Avaliações] >= 20,
+    [Nota Média Avaliação],
+    BLANK()
+)
+
+
+// --- 04. RANKINGS DINÂMICOS (CATEGORIAS) ---
+
+Ranking Faturamento Categoria = 
+IF(
+    NOT(ISBLANK([Faturamento Total])),
+    RANKX(
+        ALLSELECTED(dm_produtos[product_category_name]),
+        [Faturamento Total],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+Ranking Volume Categoria = 
+IF(
+    NOT(ISBLANK([Volume de Itens Vendidos])),
+    RANKX(
+        ALLSELECTED(dm_produtos[product_category_name]),
+        [Volume de Itens Vendidos],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+Ranking Nota Categoria (Relevante) = 
+IF(
+    NOT(ISBLANK([Nota Média Relevante (Min 25 Avaliações)])),
+    RANKX(
+        ALLSELECTED(dm_produtos[product_category_name]),
+        [Nota Média Relevante (Min 25 Avaliações)],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+
+// --- 05. RANKINGS DINÂMICOS (SELLERS) ---
+
+Ranking Faturamento Seller = 
+IF(
+    NOT(ISBLANK([Faturamento Total])),
+    RANKX(
+        ALLSELECTED(dm_sellers[seller_id]),
+        [Faturamento Total],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+Ranking Volume Seller = 
+IF(
+    NOT(ISBLANK([Volume de Itens Vendidos])),
+    RANKX(
+        ALLSELECTED(dm_sellers[seller_id]),
+        [Volume de Itens Vendidos],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+Ranking Nota Seller (Relevante) = 
+IF(
+    NOT(ISBLANK([Nota Média Seller Relevante (Min 20 Avaliações)])),
+    RANKX(
+        ALLSELECTED(dm_sellers[seller_id]),
+        [Nota Média Seller Relevante (Min 20 Avaliações)],
+        ,
+        DESC,
+        Dense
+    )
+)
+
+Ranking Ticket Médio Seller = 
+IF(
+    [Total de Pedidos] >= 10,
+    RANKX(
+        FILTER(ALLSELECTED(dm_sellers[seller_id]), [Total de Pedidos] >= 10),
+        [Ticket Médio por Pedido],
+        ,
+        DESC,
+        Dense
+    ),
+    BLANK()
+)
